@@ -1,5 +1,5 @@
 Pro spuštění je potřeba mít nainstalovaný MySQL server a aplikaci, na ktéré může server běžet - například XAMPP
-Dále je potřeba stáhnout oba zazipované soubory. V "aplikace.zip" se nachází soubor databáze a v "rezervacni_system" se nachází soubor webové aplikace.
+Dále je potřeba stáhnout oba zazipované soubory. V "aplikace.zip" se nachází soubor databáze a v "rezervacni_system_aplikace" se nachází soubor webové aplikace.
 Po spuštění databáze je potřeba skrz jakékoliv admin rozhraní spustit dotaz nahraný v souboru "databaze.sql". Tím se vytvoří kompletní databáze včetně pohledů, procedur apod.
 Dále je potřeba otevřít kompilátor jako je napřiklad Visual Studio Code, otevřít v něm projekt jako celek (Projekt lze stáhnout jako zip soubor) a do konzole zadat "npm i". Tím se nainstalují potřebné knihovny z node.js.
 V neposlední řadě je potřeba nakonfigurovat připojení k databázi v souboru connection.js
