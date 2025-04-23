@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <title>Vytvořit rezervaci</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body {
+      background: url('/images/vr-bg.png') no-repeat center center fixed;
+      background-size: cover;
+      background-color: #0b0c10;
+      color: white;
+    }
+
+    .container {
+      background-color: rgba(15, 20, 25, 0.9);
+      border-radius: 12px;
+      padding: 40px;
+      max-width: 850px;
+      margin: 60px auto;
+      box-shadow: 0 0 20px rgba(102, 252, 241, 0.2);
+    }
+
+    .form-label {
+      color: #66fcf1;
+    }
+
+    .form-control, .form-select {
+      background-color: #1f2833;
+      color: white;
+      border: none;
+    }
+
+    .form-control:focus, .form-select:focus {
+      box-shadow: 0 0 0 0.2rem rgba(102, 252, 241, 0.3);
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 10px;
+    }
+
+    .calendar-grid .day {
+      padding: 12px;
+      text-align: center;
+      border-radius: 6px;
+      background-color: #1f2833;
+      color: white;
+      cursor: pointer;
+    }
+
+    .calendar-grid .day:hover {
+      background-color: #45a29e;
+    }
+
+    .calendar-grid .day.selected {
+      background-color: #66fcf1;
+      color: black;
+      font-weight: bold;
+    }
+
+    .calendar-grid .day.fully-booked {
+      background-color: #dc3545;
+      cursor: not-allowed;
+    }
+
+    .slot {
+      padding: 10px 15px;
+      margin: 5px;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: center;
+      min-width: 110px;
+      user-select: none;
+    }
+
+    .slot.free {
+      background-color: #28a745;
+      color: white;
+    }
+
+    .slot.busy {
+      background-color: #dc3545;
+      color: white;
+      cursor: not-allowed;
+    }
+
+    .slot.selected {
+      outline: 3px solid #66fcf1;
+    }
+
+    .btn-success {
+      background-color: #45a29e;
+      border: none;
+    }
+
+    .btn-success:hover {
+      background-color: #3a8b89;
+    }
+
+    #priceDisplay {
+      color: white;
+    }
+  </style>
+</head>
+<body class="dark">
+  <%- include('partials/navbar', { user }) %>
+
+
+  <div class="container mt-4">
+    <h2 class="mb-4 text-center">Vytvořit rezervaci</h2>
+
+    <!-- Kalendář -->
+    <div class="mb-3">
+      <label class="form-label">Vyber den:</label>
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <button class="btn btn-sm btn-outline-light" id="prevWeek" disabled>&larr;</button>
+        <div id="calendarGrid" class="calendar-grid flex-grow-1 mx-3"></div>
+        <button class="btn btn-sm btn-outline-light" id="nextWeek">&rarr;</button>
+      </div>
+    </div>
+
+    <!-- Headset -->
+    <div class="mb-3">
+      <label class="form-label">Headset:</label>
+      <select name="headsetId" class="form-select" id="headsetSelect" required>
+        <% headsets.forEach(h => { %>
+          <option value="<%= h.headsetID %>"><%= h.model %></option>
+        <% }) %>
+      </select>
+    </div>
+
+    <!-- Cena -->
+    <div class="mb-3">
+      <label class="form-label">Cena</label>
+      <input type="text" id="priceDisplay" class="form-control" readonly>
+    </div>
+
+    <!-- Sloty -->
+    <div id="slotsContainer" class="mb-3 d-flex flex-wrap"></div>
+
+    <!-- Návod -->
+    <div class="mb-4">
+      <button class="btn w-100 text-start d-flex justify-content-between align-items-center instruction-toggle"
+              type="button" data-bs-toggle="collapse" data-bs-target="#instructionBox" aria-expanded="false">
+        <span><strong>Jak vytvořit rezervaci</strong></span>
+        <span class="toggle-icon">▶️</span>
+      </button>
+      <div class="collapse mt-2" id="instructionBox">
+        <div class="px-4 py-3" style="background-color: rgba(33, 45, 55, 0.85); border-left: 4px solid #66fcf1; border-radius: 6px;">
+          <ul class="mb-0 ps-3 text-white">
+            <li>Vyber si datum v kalendáři.</li>
+            <li>Zvol headset.</li>
+            <li>Klikni na časový slot – můžeš označit více za sebou.</li>
+            <li>Mezery mezi časy se automaticky vyplní.</li>
+            <li>Pokud je některý slot obsazený, výběr bude zrušen.</li>
+            <li>Stiskni tlačítko <em>Vytvořit rezervaci</em>.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Formulář -->
+    <form method="POST" action="/user/reservation/create" id="reservationForm">
+      <input type="hidden" name="reservationDate" id="reservationDateInput">
+      <input type="hidden" name="headsetId" id="hiddenHeadsetInput">
+      <input type="hidden" name="duration" id="hiddenDurationInput">
+    
+      <!-- Voucher -->
+      <div class="mb-3">
+        <label for="voucherCode" class="form-label">Slevový kód (volitelné)</label>
+        <div class="input-group">
+          <input type="text" class="form-control" id="voucherCode" name="voucherCode" placeholder="Např. VR2025">
+          <button type="button" class="btn btn-outline-info" id="validateVoucherBtn">Ověřit</button>
+        </div>
+        <div id="voucherStatus" class="form-text mt-1 text-white"></div>
+      </div>
+    
+      <button type="submit" class="btn btn-success mt-3 w-100" disabled id="submitBtn">Vytvořit rezervaci</button>
+    </form>
+    
+  </div>
+
+  <script>
+    const calendarGrid = document.getElementById('calendarGrid');
+    const prevBtn = document.getElementById('prevWeek');
+    const nextBtn = document.getElementById('nextWeek');
+    const reservationDateInput = document.getElementById('reservationDateInput');
+    const headsetSelect = document.getElementById('headsetSelect');
+    const hiddenHeadsetInput = document.getElementById('hiddenHeadsetInput');
+    const hiddenDurationInput = document.getElementById('hiddenDurationInput');
+    const priceDisplay = document.getElementById('priceDisplay');
+    const submitBtn = document.getElementById('submitBtn');
+    const slotsContainer = document.getElementById('slotsContainer');
+    const voucherCode = document.getElementById('voucherCode');
+    const fullyBookedDates = JSON.parse('<%- JSON.stringify(typeof fullyBookedDates !== "undefined" ? fullyBookedDates : []) %>');
+
+    let calendarOffset = 0;
+    const daysPerPage = 14;
+    let selectedDate = null;
+    let selectedSlots = [];
+    let timeButtons = [];
+    let occupiedData = {};
+
+    function generateCalendar() {
+      const today = new Date();
+      const baseDate = new Date();
+      baseDate.setDate(today.getDate() + calendarOffset);
+      calendarGrid.innerHTML = '';
+
+      for (let i = 0; i < daysPerPage; i++) {
+        const d = new Date(baseDate);
+        d.setDate(baseDate.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+
+        const div = document.createElement('div');
+        div.className = 'day';
+        div.dataset.date = dateStr;
+        div.textContent = d.toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' });
+
+        if (fullyBookedDates.includes(dateStr)) {
+          div.classList.add('fully-booked');
+        } else {
+          div.addEventListener('click', () => {
+            document.querySelectorAll('.calendar-grid .day').forEach(el => el.classList.remove('selected'));
+            div.classList.add('selected');
+            selectedDate = dateStr;
+            loadAvailabilityAndRender();
+          });
+        }
+
+        calendarGrid.appendChild(div);
+      }
+
+      prevBtn.disabled = calendarOffset <= 0;
+    }
+
+    nextBtn.addEventListener('click', () => { calendarOffset += daysPerPage; generateCalendar(); });
+    prevBtn.addEventListener('click', () => { if (calendarOffset > 0) { calendarOffset -= daysPerPage; generateCalendar(); } });
+
+    async function loadAvailabilityAndRender() {
+      const headsetId = headsetSelect.value;
+      if (!selectedDate || !headsetId) return;
+      const res = await fetch(`/api/reservations/${selectedDate}`);
+      occupiedData = await res.json();
+      generateTimeSlots(selectedDate, headsetId);
+    }
+
+    function generateTimeSlots(date, headsetId) {
+      const occupied = occupiedData.headsets?.[headsetId] || [];
+      slotsContainer.innerHTML = '';
+      selectedSlots = [];
+      timeButtons = [];
+
+      for (let h = 15; h < 19; h++) {
+        for (let m of [0, 30]) {
+          const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+          const div = document.createElement('div');
+          div.className = 'slot';
+          div.dataset.time = time;
+          div.innerText = formatInterval(time);
+
+          if (occupied.includes(time)) {
+            div.classList.add('busy');
+          } else {
+            div.classList.add('free');
+            div.addEventListener('click', () => handleSlotClick(div, time));
+          }
+
+          timeButtons.push(div);
+          slotsContainer.appendChild(div);
+        }
+      }
+    }
+
+    function formatInterval(startTime) {
+      const [h, m] = startTime.split(':').map(Number);
+      const start = new Date(0, 0, 0, h, m);
+      const end = new Date(start.getTime() + 30 * 60000);
+      const pad = n => n.toString().padStart(2, '0');
+      return `${startTime} - ${pad(end.getHours())}:${pad(end.getMinutes())}`;
+    }
+
+    function handleSlotClick(btn, time) {
+      if (!btn.classList.contains('free')) return;
+      const t = btn.dataset.time;
+
+      if (!selectedSlots.includes(t)) selectedSlots.push(t);
+      else selectedSlots = selectedSlots.filter(s => s !== t);
+
+      if (selectedSlots.length > 1) {
+        selectedSlots = fillGapsBetweenSlots(selectedSlots);
+        const hasBusy = selectedSlots.some(s => {
+          const b = timeButtons.find(b => b.dataset.time === s);
+          return b && b.classList.contains('busy');
+        });
+        if (hasBusy) {
+          alert("Mezi vybranými časy je obsazený slot.");
+          resetSelection();
+          return;
+        }
+      }
+
+      timeButtons.forEach(b => b.classList.remove('selected'));
+      selectedSlots.forEach(s => {
+        const b = timeButtons.find(b => b.dataset.time === s);
+        if (b) b.classList.add('selected');
+      });
+
+      updateState();
+    }
+
+    function fillGapsBetweenSlots(slots) {
+      const sorted = slots.slice().sort();
+      const [startH, startM] = sorted[0].split(':').map(Number);
+      const [endH, endM] = sorted[sorted.length - 1].split(':').map(Number);
+      const startMin = startH * 60 + startM;
+      const endMin = endH * 60 + endM;
+
+      const filled = [];
+      for (let t = startMin; t <= endMin; t += 30) {
+        const h = Math.floor(t / 60).toString().padStart(2, '0');
+        const m = (t % 60).toString().padStart(2, '0');
+        filled.push(`${h}:${m}`);
+      }
+      return filled;
+    }
+
+    function resetSelection() {
+      timeButtons.forEach(b => b.classList.remove('selected'));
+      selectedSlots = [];
+      updateState();
+    }
+
+    async function validateVoucher() {
+  const code = voucherCode.value.trim();
+  const minutes = parseInt(hiddenDurationInput.value);
+  const statusEl = document.getElementById('voucherStatus');
+
+  if (!code || !minutes) {
+    statusEl.textContent = "";
+    priceDisplay.value = (minutes * 10).toFixed(2) + " Kč";
+    return;
+  }
+
+  const res = await fetch(`/api/validate-voucher/${code}/${minutes}`);
+  const data = await res.json();
+
+  if (!data.valid) {
+    statusEl.textContent = "Neplatný voucher.";
+    priceDisplay.value = (minutes * 10).toFixed(2) + " Kč";
+  } else {
+    const pokryto = data.discountHours * 60;
+    const doplatekMinuty = minutes - pokryto;
+    const doplatek = doplatekMinuty * 10.00;
+
+    statusEl.textContent = `Voucher pokrývá ${data.discountHours} hod. Doplatek: ${doplatek.toFixed(2)} Kč`;
+    priceDisplay.value = doplatek.toFixed(2) + " Kč";
+  }
+}
+
+    function updateState() {
+      if (selectedSlots.length === 0) {
+        submitBtn.disabled = true;
+        reservationDateInput.value = '';
+        hiddenDurationInput.value = '';
+        priceDisplay.value = '';
+        return;
+      }
+
+      const startTime = selectedSlots[0];
+      const duration = selectedSlots.length * 30;
+      const endHour = parseInt(startTime.split(':')[0]) + Math.floor(duration / 60);
+      const endMin = parseInt(startTime.split(':')[1]) + (duration % 60);
+
+      if (endHour > 19 || (endHour === 19 && endMin > 0)) {
+        alert("Rezervace nemůže přesáhnout 19:00.");
+        resetSelection();
+        return;
+      }
+
+      reservationDateInput.value = selectedDate + ' ' + startTime + ':00';
+      hiddenDurationInput.value = duration;
+      hiddenHeadsetInput.value = headsetSelect.value;
+      submitBtn.disabled = false;
+
+      validateVoucher();
+    }
+
+    headsetSelect.addEventListener('change', () => {
+      if (selectedDate) loadAvailabilityAndRender();
+    });
+
+    document.getElementById('validateVoucherBtn').addEventListener('click', validateVoucher);
+
+    generateCalendar();
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
